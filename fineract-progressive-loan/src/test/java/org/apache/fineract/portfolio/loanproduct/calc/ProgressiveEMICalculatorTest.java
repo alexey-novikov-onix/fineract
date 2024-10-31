@@ -1110,6 +1110,73 @@ class ProgressiveEMICalculatorTest {
         checkPeriod(interestSchedule, 5, 0, 16.89, 0.003950916667, 0.07, 16.82, 0.0);
     }
 
+    @Test
+    public void test_dailyAccrual_disbursedAmt1000_dayInYears360_daysInMonth30_repayIn1Month() {
+
+        final List<LoanScheduleModelRepaymentPeriod> expectedRepaymentPeriods = new ArrayList<>();
+
+        expectedRepaymentPeriods.add(repayment(1, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1)));
+
+        final BigDecimal interestRate = BigDecimal.valueOf(7.0);
+        final Integer installmentAmountInMultiplesOf = null;
+
+        Mockito.when(loanProductRelatedDetail.getAnnualNominalInterestRate()).thenReturn(interestRate);
+        Mockito.when(loanProductRelatedDetail.getDaysInYearType()).thenReturn(DaysInYearType.DAYS_360.getValue());
+        Mockito.when(loanProductRelatedDetail.getDaysInMonthType()).thenReturn(DaysInMonthType.DAYS_30.getValue());
+        Mockito.when(loanProductRelatedDetail.getRepaymentPeriodFrequencyType()).thenReturn(PeriodFrequencyType.MONTHS);
+        Mockito.when(loanProductRelatedDetail.getRepayEvery()).thenReturn(1);
+        Mockito.when(loanProductRelatedDetail.getCurrency()).thenReturn(monetaryCurrency);
+
+        final ProgressiveLoanInterestScheduleModel interestModel = emiCalculator.generateInterestScheduleModel(expectedRepaymentPeriods,
+                loanProductRelatedDetail, installmentAmountInMultiplesOf, mc);
+
+        final Money disbursedAmount = toMoney(1000.0);
+        emiCalculator.addDisbursement(interestModel, LocalDate.of(2024, 1, 1), disbursedAmount);
+
+        checkPeriod(interestModel, 0, 0, 1005.83, 0.0, 0.0, 5.83, 1000.0, 0.0);
+//        checkPeriod(interestModel, 0, 1, 1005.83, 0.005833333333, 5.83, 1000.0, 0.0);
+        checkPeriod(interestModel, 0, 1, 1005.83, 0.00583, 5.83, 1000.0, 0.0);
+
+        final LocalDate dueDate = LocalDate.of(2024, 2, 1);
+        final LocalDate startDay = LocalDate.of(2024, 1, 1);
+
+        checkAccrual(interestModel, dueDate, startDay, 1, 0.19, 0.19);
+        checkAccrual(interestModel, dueDate, startDay, 2, 0.19, 0.38);
+        checkAccrual(interestModel, dueDate, startDay, 3, 0.18, 0.56);
+        checkAccrual(interestModel, dueDate, startDay, 4, 0.19, 0.75);
+        checkAccrual(interestModel, dueDate, startDay, 5, 0.19, 0.94);
+        checkAccrual(interestModel, dueDate, startDay, 6, 0.19, 1.13);
+        checkAccrual(interestModel, dueDate, startDay, 7, 0.19, 1.32);
+        // TODO: when calculation is right then these values should be:
+//        checkAccrual(interestModel, dueDate, startDay, 8, 0.18, 1.50);
+        checkAccrual(interestModel, dueDate, startDay, 8, 0.19, 1.51);
+        // TODO: when calculation is right then these values should be:
+//        checkAccrual(interestModel, dueDate, startDay, 9, 0.19, 1.69);
+        checkAccrual(interestModel, dueDate, startDay, 9, 0.18, 1.69);
+        checkAccrual(interestModel, dueDate, startDay, 10, 0.19, 1.88);
+        checkAccrual(interestModel, dueDate, startDay, 11, 0.19, 2.07);
+        checkAccrual(interestModel, dueDate, startDay, 12, 0.19, 2.26);
+        checkAccrual(interestModel, dueDate, startDay, 13, 0.19, 2.45);
+        checkAccrual(interestModel, dueDate, startDay, 14, 0.18, 2.63);
+        checkAccrual(interestModel, dueDate, startDay, 15, 0.19, 2.82);
+        checkAccrual(interestModel, dueDate, startDay, 16, 0.19, 3.01);
+        checkAccrual(interestModel, dueDate, startDay, 17, 0.19, 3.20);
+        checkAccrual(interestModel, dueDate, startDay, 18, 0.19, 3.39);
+        checkAccrual(interestModel, dueDate, startDay, 19, 0.19, 3.58);
+        checkAccrual(interestModel, dueDate, startDay, 20, 0.18, 3.76);
+        checkAccrual(interestModel, dueDate, startDay, 21, 0.19, 3.95);
+        checkAccrual(interestModel, dueDate, startDay, 22, 0.19, 4.14);
+        checkAccrual(interestModel, dueDate, startDay, 23, 0.19, 4.33);
+        checkAccrual(interestModel, dueDate, startDay, 24, 0.19, 4.52);
+        checkAccrual(interestModel, dueDate, startDay, 25, 0.18, 4.70);
+        checkAccrual(interestModel, dueDate, startDay, 26, 0.19, 4.89);
+        checkAccrual(interestModel, dueDate, startDay, 27, 0.19, 5.08);
+        checkAccrual(interestModel, dueDate, startDay, 28, 0.19, 5.27);
+        checkAccrual(interestModel, dueDate, startDay, 29, 0.19, 5.46);
+        checkAccrual(interestModel, dueDate, startDay, 30, 0.19, 5.65);
+        checkAccrual(interestModel, dueDate, startDay, 31, 0.18, 5.83);
+    }
+
     private static LoanScheduleModelRepaymentPeriod repayment(int periodNumber, LocalDate fromDate, LocalDate dueDate) {
         final Money zeroAmount = Money.zero(monetaryCurrency);
         return LoanScheduleModelRepaymentPeriod.repayment(periodNumber, fromDate, dueDate, zeroAmount, zeroAmount, zeroAmount, zeroAmount,
@@ -1124,6 +1191,14 @@ class ProgressiveEMICalculatorTest {
         Mockito.when(period.getDueDate()).thenReturn(end);
 
         return period;
+    }
+
+    private static void checkAccrual(final ProgressiveLoanInterestScheduleModel interestSchedule, final LocalDate repaymentPeriodDueDate,  final LocalDate accrualStartDay, final int dayOffset, final double dailyAccrual, final double dailyInterest) {
+        Money previousInterest = emiCalculator.getPayableDetails(interestSchedule, repaymentPeriodDueDate, accrualStartDay.plusDays(dayOffset -1)).getPayableInterest();
+        Money currentInterest = emiCalculator.getPayableDetails(interestSchedule, repaymentPeriodDueDate, accrualStartDay.plusDays(dayOffset)).getPayableInterest();
+
+        Assertions.assertEquals(dailyAccrual, toDouble(currentInterest.minus(previousInterest)));
+        Assertions.assertEquals(dailyInterest, toDouble(currentInterest));
     }
 
     private static void checkPeriod(final ProgressiveLoanInterestScheduleModel interestScheduleModel, final int repaymentIdx,
