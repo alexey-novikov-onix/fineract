@@ -193,7 +193,6 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         calculateOutstandingBalance(scheduleModel);
         calculateEMIOnPeriods(relatedRepaymentPeriods, scheduleModel);
         calculateOutstandingBalance(scheduleModel);
-        adjustRateFactor(scheduleModel);
         calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
         checkAndAdjustEmiIfNeededOnRelatedRepaymentPeriods(scheduleModel, relatedRepaymentPeriods);
     }
@@ -404,20 +403,6 @@ public final class ProgressiveEMICalculator implements EMICalculator {
                 period.setEmi(finalEqualMonthlyInstallment);
             }
         });
-    }
-
-    void adjustRateFactor(final ProgressiveLoanInterestScheduleModel scheduleModel) {
-        scheduleModel.repaymentPeriods().forEach(repaymentPeriod -> repaymentPeriod.getInterestPeriods()
-                .forEach(interestPeriod -> {
-                    if (interestPeriod.getOutstandingLoanBalance().isZero()) {
-                        return;
-                    }
-
-                    final BigDecimal adjustedRateFactor = repaymentPeriod.getDueInterest().getAmount()
-                            .divide(interestPeriod.getOutstandingLoanBalance().getAmount(), interestPeriod.getMc());
-                    interestPeriod.setRateFactor(adjustedRateFactor);
-            })
-        );
     }
 
     Money applyInstallmentAmountInMultiplesOf(final ProgressiveLoanInterestScheduleModel scheduleModel,

@@ -101,9 +101,22 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
                     .plus(previousInterestPeriod.getBalanceCorrectionAmount(), mc) //
                     .plus(previousInterestPeriod.getDisbursementAmount(), mc); //
         }
+
+        adjustRateFactor();
     }
 
     private boolean isFirstInterestPeriod() {
         return getRepaymentPeriod().getInterestPeriods().get(0).equals(this);
     }
+
+    private void adjustRateFactor() {
+        if (getOutstandingLoanBalance() == null || getOutstandingLoanBalance().isZero()) {
+           return;
+        }
+
+        final BigDecimal adjustedRateFactor = getRepaymentPeriod().getCalculatedDueInterest().getAmount()
+                .divide(getOutstandingLoanBalance().getAmount(), mc);
+        setRateFactor(adjustedRateFactor);
+    }
+
 }
