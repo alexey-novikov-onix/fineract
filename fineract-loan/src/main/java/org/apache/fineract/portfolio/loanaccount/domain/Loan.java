@@ -56,9 +56,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -3568,5 +3570,22 @@ public class Loan extends AbstractAuditableWithUTCDateTimeCustom<Long> {
 
     public boolean isProgressiveSchedule() {
         return getLoanProductRelatedDetail().getLoanScheduleType() == PROGRESSIVE;
+    }
+
+    public boolean isTransactionBeforeChargeOff(final LoanTransaction transaction) {
+        if (!this.isChargedOff()) {
+            return true;
+        }
+
+        final List<LoanTransaction> transactions = this.getLoanTransactions();
+
+        final OptionalInt chargeOffIndexOptional = IntStream.range(0, transactions.size()).filter(i -> transactions.get(i).isChargeOff())
+                .findFirst();
+
+        if (chargeOffIndexOptional.isEmpty()) {
+            return true;
+        }
+
+        return transactions.indexOf(transaction) < chargeOffIndexOptional.getAsInt();
     }
 }

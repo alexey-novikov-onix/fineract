@@ -1583,7 +1583,8 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
                                     transactionMappings, loanTransaction, oldestPastDueInstallment, currency);
                             Loan loan = loanTransaction.getLoan();
                             if (transactionCtx instanceof ProgressiveTransactionCtx ctx && loan.isInterestBearing()
-                                    && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()) {
+                                    && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()
+                                    && loanTransaction.getLoan().isTransactionBeforeChargeOff(loanTransaction)) {
                                 paidPortion = handlingPaymentAllocationForInterestBearingProgressiveLoan(loanTransaction,
                                         transactionAmountUnprocessed, balances, paymentAllocationType, oldestPastDueInstallment, ctx,
                                         loanTransactionToRepaymentScheduleMapping, oldestPastDueInstallmentCharges);
@@ -1605,7 +1606,8 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
                                     transactionMappings, loanTransaction, dueInstallment, currency);
                             Loan loan = loanTransaction.getLoan();
                             if (transactionCtx instanceof ProgressiveTransactionCtx ctx && loan.isInterestBearing()
-                                    && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()) {
+                                    && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()
+                                    && loanTransaction.getLoan().isTransactionBeforeChargeOff(loanTransaction)) {
                                 paidPortion = handlingPaymentAllocationForInterestBearingProgressiveLoan(loanTransaction,
                                         transactionAmountUnprocessed, balances, paymentAllocationType, dueInstallment, ctx,
                                         loanTransactionToRepaymentScheduleMapping, dueInstallmentCharges);
@@ -1636,7 +1638,8 @@ public class AdvancedPaymentScheduleTransactionProcessor extends AbstractLoanRep
 
                                 Loan loan = loanTransaction.getLoan();
                                 if (transactionCtx instanceof ProgressiveTransactionCtx ctx && loan.isInterestBearing()
-                                        && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()) {
+                                        && loan.getLoanProductRelatedDetail().isInterestRecalculationEnabled()
+                                        && loanTransaction.getLoan().isTransactionBeforeChargeOff(loanTransaction)) {
                                     paidPortion = handlingPaymentAllocationForInterestBearingProgressiveLoan(loanTransaction, evenPortion,
                                             balances, paymentAllocationType, inAdvanceInstallment, ctx,
                                             loanTransactionToRepaymentScheduleMapping, inAdvanceInstallmentCharges);

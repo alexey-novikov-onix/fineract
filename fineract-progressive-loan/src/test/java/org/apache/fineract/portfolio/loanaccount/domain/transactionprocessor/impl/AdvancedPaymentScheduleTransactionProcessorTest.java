@@ -451,6 +451,7 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         LoanPaymentAllocationRule loanPaymentAllocationRule = mock(LoanPaymentAllocationRule.class);
         when(loan.isInterestBearing()).thenReturn(true);
         when(loanProductRelatedDetail.isInterestRecalculationEnabled()).thenReturn(true);
+        when(loan.isTransactionBeforeChargeOff(loanTransaction)).thenReturn(true);
 
         when(loanTransaction.getLoan()).thenReturn(loan);
         when(loan.getCurrency()).thenReturn(currency);
