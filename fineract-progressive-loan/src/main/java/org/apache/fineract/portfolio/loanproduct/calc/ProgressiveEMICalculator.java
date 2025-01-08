@@ -294,6 +294,13 @@ public final class ProgressiveEMICalculator implements EMICalculator {
         checkAndAdjustEmiIfNeededOnRelatedRepaymentPeriods(scheduleModel, relatedRepaymentPeriods);
     }
 
+    void calculateRateFactorsForInterestPause(final ProgressiveLoanInterestScheduleModel scheduleModel) {
+        final List<RepaymentPeriod> relatedRepaymentPeriods = scheduleModel.getRelatedRepaymentPeriods(scheduleModel.getStartDate());
+        calculateRateFactorForPeriods(relatedRepaymentPeriods, scheduleModel);
+        calculateOutstandingBalance(scheduleModel);
+        calculateLastUnpaidRepaymentPeriodEMI(scheduleModel);
+    }
+
     private void calculateLastUnpaidRepaymentPeriodEMI(ProgressiveLoanInterestScheduleModel scheduleModel) {
         MathContext mc = scheduleModel.mc();
         Money totalDueInterest = scheduleModel.repaymentPeriods().stream().map(RepaymentPeriod::getDueInterest).reduce(scheduleModel.zero(),
@@ -739,6 +746,13 @@ public final class ProgressiveEMICalculator implements EMICalculator {
                 .map(repaymentPeriodDueDate -> getDueAmounts(scheduleModel, repaymentPeriodDueDate, subjectDate) //
                         .getDueInterest()) //
                 .reduce(scheduleModel.zero(), Money::add); //
+    }
+
+    @Override
+    public void applyInterestPause(final ProgressiveLoanInterestScheduleModel scheduleModel, final LocalDate fromDate,
+            final LocalDate endDate, final BigDecimal newInterestRate) {
+        scheduleModel.updateInterestPeriodsWithInterestPause(fromDate, endDate, scheduleModel.zero(), scheduleModel.zero())
+                .forEach(repaymentPeriod -> calculateRateFactorsForInterestPause(scheduleModel));
     }
 
     private long getUncountablePeriods(final List<RepaymentPeriod> relatedRepaymentPeriods, final Money originalEmi) {

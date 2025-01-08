@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.Optional;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,6 +35,7 @@ import org.apache.fineract.organisation.monetary.domain.Money;
 @Getter
 @ToString(exclude = { "repaymentPeriod" })
 @EqualsAndHashCode(exclude = { "repaymentPeriod" })
+@AllArgsConstructor
 public class InterestPeriod implements Comparable<InterestPeriod> {
 
     private final RepaymentPeriod repaymentPeriod;
@@ -49,6 +51,7 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
     private Money balanceCorrectionAmount;
     private Money outstandingLoanBalance;
     private final MathContext mc;
+    private final boolean isPause;
 
     public InterestPeriod(RepaymentPeriod repaymentPeriod, LocalDate fromDate, LocalDate dueDate, BigDecimal rateFactor,
             BigDecimal rateFactorTillPeriodDueDate, Money disbursementAmount, Money balanceCorrectionAmount, Money outstandingLoanBalance,
@@ -62,6 +65,7 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
         this.balanceCorrectionAmount = balanceCorrectionAmount;
         this.outstandingLoanBalance = outstandingLoanBalance;
         this.mc = mc;
+        this.isPause = false;
     }
 
     public InterestPeriod(RepaymentPeriod repaymentPeriod, InterestPeriod interestPeriod) {
@@ -84,6 +88,10 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
     }
 
     public Money getCalculatedDueInterest() {
+        if (isPause) {
+            return Money.zero(outstandingLoanBalance.getCurrencyData(), mc);
+        }
+
         long lengthTillPeriodDueDate = getLengthTillPeriodDueDate();
         final BigDecimal interestDueTillRepaymentDueDate = lengthTillPeriodDueDate == 0 //
                 ? BigDecimal.ZERO //

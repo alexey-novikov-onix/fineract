@@ -143,6 +143,24 @@ public class ProgressiveLoanInterestScheduleModel {
                 .findFirst();//
     }
 
+    public List<RepaymentPeriod> updateInterestPeriodsWithInterestPause(final LocalDate fromDate, final LocalDate endDate,
+            final Money disbursedAmount, final Money correctionAmount) {
+        final List<RepaymentPeriod> affectedPeriods = findRepaymentPeriodsForInterestPause(fromDate, endDate);
+
+        for (RepaymentPeriod period : affectedPeriods) {
+            updateInterestPeriodOnRepaymentPeriodWithInterestPause(period, fromDate, endDate, disbursedAmount, correctionAmount);
+        }
+        return affectedPeriods;
+    }
+
+    private List<RepaymentPeriod> findRepaymentPeriodsForInterestPause(final LocalDate fromDate, final LocalDate endDate) {
+        return repaymentPeriods.stream().filter(period -> isPeriodInRange(period, fromDate, endDate)).toList();
+    }
+
+    private boolean isPeriodInRange(final RepaymentPeriod repaymentPeriod, final LocalDate fromDate, final LocalDate endDate) {
+        return !(endDate.isBefore(repaymentPeriod.getFromDate()) || fromDate.isAfter(repaymentPeriod.getDueDate()));
+    }
+
     Optional<RepaymentPeriod> findRepaymentPeriodForBalanceChange(final LocalDate balanceChangeDate) {
         if (balanceChangeDate == null) {
             return Optional.empty();
@@ -175,6 +193,18 @@ public class ProgressiveLoanInterestScheduleModel {
         };
     }
 
+    private void updateInterestPeriodOnRepaymentPeriodWithInterestPause(final RepaymentPeriod repaymentPeriod, final LocalDate fromDate,
+            final LocalDate endDate, final Money disbursedAmount, final Money correctionAmount) {
+        final Optional<InterestPeriod> interestPeriodOptional = findInterestPeriodForBalanceChangeForInterestPause(repaymentPeriod,
+                fromDate, endDate);
+        if (interestPeriodOptional.isPresent()) {
+            interestPeriodOptional.get().addDisbursementAmount(disbursedAmount);
+            interestPeriodOptional.get().addBalanceCorrectionAmount(correctionAmount);
+        } else {
+            applyInterestPauseToRepaymentPeriod(repaymentPeriod, fromDate, endDate, disbursedAmount, correctionAmount);
+        }
+    }
+
     Optional<InterestPeriod> findInterestPeriodForBalanceChange(final RepaymentPeriod repaymentPeriod, final LocalDate balanceChangeDate) {
         if (repaymentPeriod == null || balanceChangeDate == null) {
             return Optional.empty();
@@ -184,26 +214,72 @@ public class ProgressiveLoanInterestScheduleModel {
                 .findFirst();
     }
 
+    Optional<InterestPeriod> findInterestPeriodForBalanceChangeForInterestPause(final RepaymentPeriod repaymentPeriod,
+            final LocalDate startDate, final LocalDate endDate) {
+        if (repaymentPeriod == null || startDate == null || endDate == null) {
+            return Optional.empty();
+        }
+        return repaymentPeriod.getInterestPeriods().stream()//
+                .filter(interestPeriod -> startDate.isEqual(interestPeriod.getFromDate()) && endDate.isEqual(interestPeriod.getDueDate()))//
+                .findFirst();
+    }
+
     void insertInterestPeriod(final RepaymentPeriod repaymentPeriod, final LocalDate balanceChangeDate, final Money disbursedAmount,
             final Money correctionAmount) {
-        final InterestPeriod previousInterestPeriod;
-        if (balanceChangeDate.isAfter(repaymentPeriod.getFromDate())) {
-            previousInterestPeriod = repaymentPeriod.getInterestPeriods().get(repaymentPeriod.getInterestPeriods().size() - 1);//
+        final InterestPeriod previousInterestPeriod = findPreviousInterestPeriod(repaymentPeriod, balanceChangeDate);
+        final LocalDate originalDueDate = previousInterestPeriod.getDueDate();
+        final LocalDate newDueDate = calculateNewDueDate(previousInterestPeriod, balanceChangeDate);
+
+        updatePreviousInterestPeriod(previousInterestPeriod, newDueDate, disbursedAmount, correctionAmount);
+
+        final InterestPeriod interestPeriod = new InterestPeriod(repaymentPeriod, newDueDate, originalDueDate, BigDecimal.ZERO,
+                BigDecimal.ZERO, zero, zero, zero, mc);
+        repaymentPeriod.getInterestPeriods().add(interestPeriod);
+    }
+
+    void applyInterestPauseToRepaymentPeriod(final RepaymentPeriod repaymentPeriod, final LocalDate fromDate, final LocalDate endDate,
+            final Money disbursedAmount, final Money correctionAmount) {
+        final InterestPeriod previousInterestPeriod = findPreviousInterestPeriod(repaymentPeriod, fromDate);
+        final LocalDate originalFromDate = previousInterestPeriod.getFromDate();
+        final LocalDate originalDueDate = previousInterestPeriod.getDueDate();
+        final LocalDate newDueDate = calculateNewDueDate(previousInterestPeriod, fromDate.minusDays(1));
+
+        if (fromDate.isAfter(originalFromDate) && endDate.isBefore(originalDueDate)) {
+            updatePreviousInterestPeriod(previousInterestPeriod, newDueDate, disbursedAmount, correctionAmount);
+            final InterestPeriod interestPausePeriod = new InterestPeriod(repaymentPeriod, newDueDate, endDate, BigDecimal.ZERO,
+                    BigDecimal.ZERO, zero, zero, zero, mc, true);
+            repaymentPeriod.getInterestPeriods().add(interestPausePeriod);
+            final InterestPeriod interestAfterPausePeriod = new InterestPeriod(repaymentPeriod, endDate, originalDueDate, BigDecimal.ZERO,
+                    BigDecimal.ZERO, zero, zero, zero, mc);
+            repaymentPeriod.getInterestPeriods().add(interestAfterPausePeriod);
+        }
+
+        if (fromDate.isAfter(originalFromDate) && endDate.isAfter(originalDueDate)) {
+            updatePreviousInterestPeriod(previousInterestPeriod, newDueDate, disbursedAmount, correctionAmount);
+            final InterestPeriod interestPausePeriod = new InterestPeriod(repaymentPeriod, newDueDate, originalDueDate, BigDecimal.ZERO,
+                    BigDecimal.ZERO, zero, zero, zero, mc, true);
+            repaymentPeriod.getInterestPeriods().add(interestPausePeriod);
+        }
+
+        if (fromDate.isBefore(originalFromDate) && endDate.isBefore(originalDueDate)) {
+            repaymentPeriod.getInterestPeriods().clear();
+            final InterestPeriod interestPausePeriod = new InterestPeriod(repaymentPeriod, newDueDate, originalDueDate, BigDecimal.ZERO,
+                    BigDecimal.ZERO, zero, zero, zero, mc, true);
+            repaymentPeriod.getInterestPeriods().add(interestPausePeriod);
+            InterestPeriod interestAfterPausePeriod = new InterestPeriod(repaymentPeriod, endDate, originalDueDate, BigDecimal.ZERO,
+                    BigDecimal.ZERO, zero, zero, zero, mc);
+            repaymentPeriod.getInterestPeriods().add(interestAfterPausePeriod);
+        }
+    }
+
+    private InterestPeriod findPreviousInterestPeriod(final RepaymentPeriod repaymentPeriod, final LocalDate date) {
+        if (date.isAfter(repaymentPeriod.getFromDate())) {
+            return repaymentPeriod.getInterestPeriods().get(repaymentPeriod.getInterestPeriods().size() - 1);
         } else {
-            previousInterestPeriod = repaymentPeriod.getInterestPeriods().stream()
-                    .filter(ip -> balanceChangeDate.isAfter(ip.getFromDate()) && !balanceChangeDate.isAfter(ip.getDueDate()))//
-                    .reduce((first, second) -> second)//
+            return repaymentPeriod.getInterestPeriods().stream()
+                    .filter(ip -> date.isAfter(ip.getFromDate()) && !date.isAfter(ip.getDueDate())).reduce((first, second) -> second)
                     .orElse(repaymentPeriod.getInterestPeriods().get(0));
         }
-        LocalDate originalDueDate = previousInterestPeriod.getDueDate();
-        LocalDate newDueDate = balanceChangeDate.isBefore(previousInterestPeriod.getFromDate()) ? previousInterestPeriod.getFromDate()
-                : balanceChangeDate.isAfter(previousInterestPeriod.getDueDate()) ? previousInterestPeriod.getDueDate() : balanceChangeDate;
-        previousInterestPeriod.setDueDate(newDueDate);
-        previousInterestPeriod.addDisbursementAmount(disbursedAmount);
-        previousInterestPeriod.addBalanceCorrectionAmount(correctionAmount);
-        final InterestPeriod interestPeriod = new InterestPeriod(repaymentPeriod, previousInterestPeriod.getDueDate(), originalDueDate,
-                BigDecimal.ZERO, BigDecimal.ZERO, zero, zero, zero, mc);
-        repaymentPeriod.getInterestPeriods().add(interestPeriod);
     }
 
     public Money getTotalDueInterest() {
@@ -228,5 +304,17 @@ public class ProgressiveLoanInterestScheduleModel {
         return repaymentPeriods.stream() //
                 .filter(period -> isInPeriod(transactionDate, period.getFromDate(), period.getDueDate(), period.isFirstRepaymentPeriod()))//
                 .findFirst();
+    }
+
+    private LocalDate calculateNewDueDate(final InterestPeriod previousInterestPeriod, final LocalDate date) {
+        return date.isBefore(previousInterestPeriod.getFromDate()) ? previousInterestPeriod.getFromDate()
+                : date.isAfter(previousInterestPeriod.getDueDate()) ? previousInterestPeriod.getDueDate() : date;
+    }
+
+    private void updatePreviousInterestPeriod(final InterestPeriod previousInterestPeriod, final LocalDate newDueDate,
+            final Money disbursedAmount, final Money correctionAmount) {
+        previousInterestPeriod.setDueDate(newDueDate);
+        previousInterestPeriod.addDisbursementAmount(disbursedAmount);
+        previousInterestPeriod.addBalanceCorrectionAmount(correctionAmount);
     }
 }
